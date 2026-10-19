@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Versus — Systems, Research & Open Source</title>
+<meta name="description" content="Versus: Python, Rust, Julia and OCaml developer working on urban analytics, AI risk research, and high-performance computing.">
+<style>
+  :root {
+    --bg: #0b0d12;
+    --surface: #131720;
+    --border: #232a38;
+    --text: #e6e9ef;
+    --muted: #8b93a7;
+    --accent: #ff4d7d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #fafaf8;
+      --surface: #ffffff;
+      --border: #e3e3df;
+      --text: #1a1c22;
+      --muted: #5d6475;
+      --accent: #d6174f;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #fafaf8; --surface: #ffffff; --border: #e3e3df;
+    --text: #1a1c22; --muted: #5d6475; --accent: #d6174f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+
+  nav {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav .wrap { display: flex; justify-content: space-between; align-items: center; height: 56px; }
+  nav .logo { font-weight: 700; letter-spacing: .5px; color: var(--text); }
+  nav ul { display: flex; gap: 20px; list-style: none; font-size: 14px; }
+  nav ul a { color: var(--muted); }
+  nav ul a:hover { color: var(--text); text-decoration: none; }
+  #theme {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 13px;
+  }
+
+  header.hero { padding: 110px 0 80px; }
+  .hero .tag {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: var(--accent); font-size: 14px; margin-bottom: 14px;
+  }
+  .hero h1 { font-size: clamp(44px, 9vw, 76px); line-height: 1.05; letter-spacing: -1.5px; }
+  .hero p { color: var(--muted); font-size: 19px; max-width: 600px; margin-top: 20px; }
+  .btns { margin-top: 32px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn {
+    padding: 10px 20px; border-radius: 8px; font-size: 15px; font-weight: 600;
+    border: 1px solid var(--border); color: var(--text);
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:hover { text-decoration: none; opacity: .9; }
+
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--accent); margin-bottom: 28px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  .skills { display: grid; gap: 18px; }
+  .skill-row { display: grid; grid-template-columns: 110px 1fr; gap: 12px; align-items: start; }
+  .skill-row b { color: var(--muted); font-weight: 500; font-size: 14px; padding-top: 5px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 4px 12px; border-radius: 999px; font-size: 13.5px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; margin-bottom: 18px;
+  }
+  .card h3 { font-size: 19px; margin-bottom: 4px; }
+  .card .sub { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
+  .card ul { padding-left: 18px; color: var(--text); }
+  .card li { margin-bottom: 7px; font-size: 15.5px; }
+  .card li::marker { color: var(--accent); }
+  .badge {
+    display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent); margin-left: 8px; vertical-align: middle; font-weight: 600;
+  }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; }
+  .grid .card { margin-bottom: 0; }
+  .grid .card p { font-size: 15px; color: var(--muted); }
+
+  .edu-item { margin-bottom: 16px; }
+  .edu-item b { display: block; }
+  .edu-item span { color: var(--muted); font-size: 14px; }
+
+  .contact-box { text-align: center; padding: 20px 0 10px; }
+  .contact-box p { color: var(--muted); margin-bottom: 18px; }
+  .discord {
+    display: inline-block; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 20px; padding: 12px 26px; border: 1px dashed var(--accent);
+    border-radius: 10px; cursor: pointer; background: var(--surface);
+  }
+
+  footer { padding: 30px 0 50px; text-align: center; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+
+  @media (max-width: 620px) {
+    nav ul { display: none; }
+    .skill-row { grid-template-columns: 1fr; gap: 4px; }
+    header.hero { padding: 70px 0 50px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <span class="logo">versus<span style="color:var(--accent)">.</span></span>
+    <ul>
+      <li><a href="#skills">Skills</a></li>
+      <li><a href="#research">Research</a></li>
+      <li><a href="#open-source">Open Source</a></li>
+      <li><a href="#projects">Projects</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <button id="theme" aria-label="Toggle theme">Theme</button>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="tag">$ whoami</div>
+    <h1>Versus</h1>
+    <p>I build systems and run research at the intersection of data, urban analytics, AI risk, and high-performance computing. Python, Rust, Julia and OCaml are my daily tools.</p>
+    <div class="btns">
+      <a class="btn primary" href="#research">See my research</a>
+      <a class="btn" href="https://github.com/VERSUS-DEV" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn" href="#contact">Get in touch</a>
+    </div>
+  </div>
+</header>
+
+<section id="skills">
+  <div class="wrap">
+    <h2>// Skills</h2>
+    <div class="skills">
+      <div class="skill-row"><b>Languages</b>
+        <div class="chips">
+          <span class="chip">Python</span><span class="chip">C</span><span class="chip">Julia</span>
+          <span class="chip">SQL (SQLite)</span><span class="chip">Rust</span><span class="chip">OCaml</span>
+        </div>
+      </div>
+      <div class="skill-row"><b>Libraries</b>
+        <div class="chips">
+          <span class="chip">NumPy</span><span class="chip">Pandas</span><span class="chip">OSMnx</span>
+          <span class="chip">Matplotlib</span><span class="chip">PIL</span><span class="chip">Scikit-learn</span><span class="chip">Geopandas</span>
+        </div>
+      </div>
+      <div class="skill-row"><b>Tools</b>
+        <div class="chips">
+          <span class="chip">GitHub</span><span class="chip">Git</span><span class="chip">Zenodo</span>
+          <span class="chip">Vim</span><span class="chip">Ollama</span><span class="chip">ffmpeg</span><span class="chip">Bloomberg Terminal</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="research">
+  <div class="wrap">
+    <h2>// Publications &amp; Research</h2>
+
+    <div class="card">
+      <h3>Sustainable Urban Development: A Case Study of Lucknow <span class="badge">3rd Rank</span></h3>
+      <div class="sub">Author · Solo competitor, BBAU Research Hackathon</div>
+      <ul>
+        <li>Placed 3rd as a solo competitor, ahead of teams of postgraduate students.</li>
+        <li>Built a Python pipeline with OSMnx, Pandas and NumPy to extract and clean large spatial network datasets from OpenStreetMap.</li>
+        <li>Calculated six core network metrics, such as street density and dead-end ratios, to quantify differences between urban zones.</li>
+        <li>Found a spatial data anomaly where a historic monument’s grounds artificially masked a severe local green space deficit.</li>
+        <li>Wrote automated Matplotlib scripts to map street graphs and proposed 14 data-driven infrastructure upgrades.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Dark LLM Triad: AI &amp; Confidentiality</h3>
+      <div class="sub">Author</div>
+      <ul>
+        <li>Developed the “Dark LLM Triad” framework covering three major risks when governments adopt AI: data leaks (Data Hemorrhage), blind trust in AI output (Overconfidence), and language cost disparities (Script Bias).</li>
+        <li>Created custom Python scoring indexes (DLSI and HRI) that turn high-profile real-world failures into clear, numeric risk metrics.</li>
+        <li>Built a tokenization benchmarking script with Tiktoken and Transformers, showing that Hindi faces a 3.04x cost penalty while Chinese is more cost-effective than English.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="open-source">
+  <div class="wrap">
+    <h2>// Open Source</h2>
+
+    <div class="card">
+      <h3>Kedro</h3>
+      <div class="sub">Linux Foundation / LF AI &amp; Data · Merged PR #5693</div>
+      <ul>
+        <li>Developed and merged Pull Request #5693 into the core codebase of the open-source data pipeline framework.</li>
+        <li>Built a static redirect validation script to fix a repo infrastructure bug, keeping community docs online and accessible.</li>
+        <li>Followed production-grade code review, Git workflows and automated testing to maintain core framework stability.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Jexpresso</h3>
+      <div class="sub">Open-source parallel multiphysics solver in Julia · Official Developer</div>
+      <ul>
+        <li>Contributing as an official developer to a high-performance parallel multiphysics solver written in Julia.</li>
+        <li>Optimizing memory layouts, data structures and kernel execution parameters to improve concurrent processing efficiency.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="projects">
+  <div class="wrap">
+    <h2>// Projects</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><a href="https://github.com/Versus-DEV/LightTime" target="_blank" rel="noopener">LightTime</a></h3>
+        <div class="sub">Rust</div>
+        <p>A concurrent distributed ledger using sub-linear mining curves (√x) and sequential VDF locks to neutralize capital concentration exploits.</p>
+      </div>
+      <div class="card">
+        <h3><a href="https://github.com/Versus-DEV/Figgie-Analysis" target="_blank" rel="noopener">Figgie-Analysis</a></h3>
+        <div class="sub">Julia</div>
+        <p>A 1:1 double-auction simulator with hand-rolled Markov chains to isolate systemic tail-risk anomalies in zero-sum markets.</p>
+      </div>
+      <div class="card">
+        <h3><a href="https://github.com/Versus-DEV/JaneStreet-lite" target="_blank" rel="noopener">JaneStreet-lite</a></h3>
+        <div class="sub">OCaml</div>
+        <p>A low-latency high-frequency trading infrastructure prototype with a deterministic matching engine and an atomic pre-trade risk engine.</p>
+      </div>
+    </div>
+    <p style="margin-top:22px;font-size:14px;color:var(--muted)">
+      Source for all of these lives on <a href="https://github.com/VERSUS-DEV" target="_blank" rel="noopener">GitHub</a>.
+    </p>
+  </div>
+</section>
+
+<section id="background">
+  <div class="wrap">
+    <h2>// Background</h2>
+    <div class="edu-item">
+      <b>IIT Madras — BS in Data Science &amp; Applications</b>
+      <span>2026 – Present</span>
+    </div>
+    <div class="edu-item">
+      <b>Babasaheb Bhimrao Ambedkar University — B.Tech (Civil)</b>
+      <span>2026 – Present · Dual degree</span>
+    </div>
+    <p style="color:var(--muted);font-size:15px;margin-top:6px">
+      Coursework: Differential &amp; Integral Calculus, Linear Algebra &amp; Matrix Analysis, Discrete Mathematics, Computer Programming (C/Python).
+    </p>
+    <p style="margin-top:22px;font-size:15px">
+      <b>Outside work:</b> advanced math problem solving, and swimming (completed a 5 km freestyle).
+    </p>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="wrap contact-box">
+    <h2>// Contact</h2>
+    <p>The best way to reach me is Discord.</p>
+    <span class="discord" id="dc" title="Click to copy">drhayren</span>
+    <p id="copied" style="margin-top:12px;font-size:13px;height:18px"></p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">© <span id="yr"></span> Versus · versus.linkpc.net</div>
+</footer>
+
+<script>
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  var root = document.documentElement;
+  try {
+    var saved = localStorage.getItem('theme');
+    if (saved) root.setAttribute('data-theme', saved);
+  } catch (e) {}
+  document.getElementById('theme').addEventListener('click', function () {
+    var isDark = root.getAttribute('data-theme') === 'dark' ||
+      (!root.getAttribute('data-theme') && !window.matchMedia('(prefers-color-scheme: light)').matches);
+    var next = isDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch (e) {}
+  });
+
+  document.getElementById('dc').addEventListener('click', function () {
+    var note = document.getElementById('copied');
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText('drhayren').then(function () {
+        note.textContent = 'Discord username copied.';
+        setTimeout(function () { note.textContent = ''; }, 2000);
+      });
+    }
+  });
+</script>
+</body>
+</html>
