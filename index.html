@@ -588,12 +588,12 @@ body[data-theme="day"] .vignette{opacity:.45}
   var ORDER = ['hub', 'skills', 'research', 'opensource', 'projects', 'contact'];
   var TITLES = { hub: 'SITE OFFICE', skills: 'SKILLS', research: 'RESEARCH', opensource: 'OPEN SOURCE', projects: 'PROJECTS', contact: 'CONTACT' };
   var CAM = {
-    hub:        { p: [15, 7.5, 19],  l: [1.5, 5.5, 0] },
-    skills:     { p: [-9, 4, 13],    l: [0, 4.5, 0] },
-    research:   { p: [0, 19, 12],    l: [0, 3, 0] },
-    opensource: { p: [18, 12, 6],    l: [5, 9, 0] },
-    projects:   { p: [-14, 9, -10],  l: [0, 6, 0] },
-    contact:    { p: [6, 2, 15],     l: [0, 8, 0] }
+    hub:        { p: [30, 15, 35],  l: [0, 5, 0] },
+    skills:     { p: [-20, 10, 25],  l: [0, 5, 0] },
+    research:   { p: [0, 30, 20],    l: [0, 10, 0] },
+    opensource: { p: [35, 20, 10],   l: [0, 10, 0] },
+    projects:   { p: [-25, 15, -20], l: [0, 10, 0] },
+    contact:    { p: [15, 8, 25],    l: [0, 10, 0] }
   };
   var N = 10;
   var state = { built: 0, scrollProg: 0, key: 'hub', vel: 0 };
@@ -985,7 +985,8 @@ body[data-theme="day"] .vignette{opacity:.45}
 
     var groundMat = new THREE.MeshStandardMaterial({ color: 0x1b1f28, roughness: 1 });
     var ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), groundMat);
-    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.5;
+    ground.rotation.x = -Math.PI / 2; 
+    ground.position.y = -0.5;
     scene.add(ground);
     
     var grid = new THREE.GridHelper(160, 80, 0xffc400, 0x2a2d34);
@@ -997,13 +998,37 @@ body[data-theme="day"] .vignette{opacity:.45}
     // --- LOAD THE SKETCHFAB GLTF MODEL ---
     var cityModel = null;
     var loader = new THREE.GLTFLoader();
-    // IMPORTANT: Ensure this path matches your repository structure!
     loader.load('./models/city.glb', function (gltf) {
         cityModel = gltf.scene;
         
-        // TWEAK THESE VALUES to fit the model to your camera paths
-        cityModel.scale.set(0.5, 0.5, 0.5); 
-        cityModel.position.set(0, -0.5, 0); 
+        console.log('Model loaded successfully!');
+        console.log('Model children:', cityModel.children.length);
+        
+        // Calculate bounding box to understand the model's actual size
+        var box = new THREE.Box3().setFromObject(cityModel);
+        var size = box.getSize(new THREE.Vector3());
+        var center = box.getCenter(new THREE.Vector3());
+        
+        console.log('Model size:', size);
+        console.log('Model center:', center);
+        
+        // Auto-scale the model to fit a reasonable size
+        var maxDim = Math.max(size.x, size.y, size.z);
+        var targetSize = 50; // Target size in world units
+        var scale = targetSize / maxDim;
+        
+        console.log('Auto-calculated scale:', scale);
+        
+        cityModel.scale.set(scale, scale, scale);
+        
+        // Recalculate after scaling
+        box = new THREE.Box3().setFromObject(cityModel);
+        center = box.getCenter(new THREE.Vector3());
+        
+        // Center the model at origin and place it on the ground
+        cityModel.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+        
+        console.log('Final position:', cityModel.position);
         
         cityModel.traverse(function (child) {
             if (child.isMesh) {
@@ -1011,11 +1036,12 @@ body[data-theme="day"] .vignette{opacity:.45}
                 child.receiveShadow = true;
             }
         });
+        
         scene.add(cityModel);
+        console.log('Model added to scene');
     }, undefined, function (error) {
         console.error('An error happened loading the city model:', error);
     });
-
     var camPos = new THREE.Vector3(24, 10, 28), camLook = new THREE.Vector3(1.5, 5, 0);
     var desired = new THREE.Vector3(), lookT = new THREE.Vector3(), prev = camPos.clone();
     var motion = 0, time = 0;
