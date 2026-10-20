@@ -387,6 +387,197 @@ body[data-theme="day"] .vignette{opacity:.45}
     height: 18px;
   }
 }
+/* =========================================
+   HUB SPECIFIC MOBILE FIXES
+   ========================================= */
+
+@media (max-width: 768px) {
+  /* Hub Grid - Stack properly on mobile */
+  .hub-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  /* Sidebar/Profile Panel */
+  .hub-grid > aside {
+    order: 1; /* Profile comes first on mobile */
+  }
+  
+  .hub-grid > nav {
+    order: 2; /* Menu comes second */
+  }
+  
+  /* Avatar Cube - Smaller on mobile */
+  .avatar {
+    width: 80px;
+    height: 80px;
+  }
+  .cube i {
+    font-size: 40px;
+  }
+  
+  /* Glitch Title - Prevent overflow */
+  .glitch {
+    font-size: 32px;
+    line-height: 1.1;
+  }
+  
+  /* Player Tag */
+  .pt {
+    font-size: 9px;
+    padding: 3px 6px;
+  }
+  
+  /* Class/Role Text */
+  .cls {
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  
+  /* Bio Text */
+  .bio {
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 16px 0;
+  }
+  
+  /* Stats Grid - Better mobile layout */
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .stat {
+    padding: 10px 12px;
+  }
+  .stat b {
+    font-size: 28px;
+  }
+  .stat span {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+  
+  /* Progress Bar */
+  .pbar {
+    margin-top: 16px;
+  }
+  .pbar .lab {
+    font-size: 10px;
+    margin-bottom: 6px;
+  }
+  .track {
+    height: 20px;
+  }
+  
+  /* Achievements Section */
+  .ach {
+    margin-top: 18px;
+  }
+  .ach h4 {
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+  .badges {
+    grid-template-columns: repeat(3, 1fr); /* 3 columns instead of 5 */
+    gap: 8px;
+  }
+  .badge {
+    font-size: 16px;
+    padding: 8px 0;
+    aspect-ratio: auto;
+    min-height: 44px; /* Touch target size */
+  }
+  #achText {
+    font-size: 13px;
+    min-height: 36px;
+    margin-top: 10px;
+    padding-left: 8px;
+  }
+  
+  /* Menu Tiles - Full width, better spacing */
+  .menu {
+    gap: 14px;
+  }
+  .menu-h {
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+  .tile {
+    padding: 16px 54px 16px 72px;
+    min-height: 80px;
+  }
+  .tile .no {
+    width: 56px;
+    font-size: 26px;
+  }
+  .tile h3 {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+  .tile p {
+    font-size: 13px;
+    margin-top: 6px;
+  }
+  .tile .go {
+    right: 16px;
+    font-size: 20px;
+    margin-top: -12px;
+  }
+  .tile .ck {
+    font-size: 10px;
+    right: 12px;
+    top: 8px;
+  }
+  
+  /* Keys/Shortcuts text */
+  .keys {
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  .keys kbd {
+    font-size: 10px;
+    padding: 2px 5px;
+  }
+}
+
+/* Small Mobile (max-width: 480px) */
+@media (max-width: 480px) {
+  .avatar {
+    width: 64px;
+    height: 64px;
+  }
+  .cube i {
+    font-size: 32px;
+  }
+  .glitch {
+    font-size: 28px;
+  }
+  .bio {
+    font-size: 13px;
+  }
+  .tile {
+    padding: 14px 48px 14px 64px;
+    min-height: 72px;
+  }
+  .tile .no {
+    width: 48px;
+    font-size: 22px;
+  }
+  .tile h3 {
+    font-size: 18px;
+  }
+  .tile p {
+    font-size: 12px;
+  }
+  .badges {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .badge {
+    font-size: 14px;
+    min-height: 40px;
+  }
+}
 </style>
 <noscript><style>.r{opacity:1!important;transform:none!important;filter:none!important}.view{display:block!important;position:static!important}#loader{display:none}html,body{overflow:auto!important}</style></noscript>
 </head>
