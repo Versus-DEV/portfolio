@@ -222,7 +222,11 @@ body:not([data-view="hub"]) #gauge{display:flex}
 .ctl button{font:400 12px Bungee,Impact,sans-serif;padding:8px 10px;border:3px solid #000;background:var(--s2);color:var(--paper);cursor:pointer;white-space:nowrap;transition:transform .12s,background .12s,color .12s}
 .ctl button:hover{transform:translateY(-2px);background:var(--s3)}
 .ctl button.on{background:var(--y);color:#000}
-.panel,.tile{background:rgba(22,24,29,.8);backdrop-filter:blur(7px) saturate(1.15)}
+.panel,.tile{background:rgba(22,24,29,.82);backdrop-filter:none}
+.hud{backdrop-filter:none;background:rgba(11,12,15,.95)}
+.track i,.cmp .trk i{animation:none}
+body[data-theme="day"]{--mut:#d3dbe9}
+body[data-theme="day"] .vignette{opacity:.3}
 .vignette{background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(0,0,0,.42) 100%);transition:opacity .8s}
 .scan{opacity:.035}
 body[data-theme="day"] .vignette{opacity:.45}
@@ -239,7 +243,6 @@ body[data-theme="day"] .vignette{opacity:.45}
 
 <canvas id="gl" aria-hidden="true"></canvas>
 <div class="vignette"></div>
-<div class="scan"></div>
 
 <div id="loader" role="status" aria-live="polite">
   <div class="ld">
@@ -573,7 +576,6 @@ body[data-theme="day"] .vignette{opacity:.45}
 
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function () {
   'use strict';
@@ -921,390 +923,299 @@ body[data-theme="day"] .vignette{opacity:.45}
 
   var world = null;
   function initWorld() {
-    if (typeof THREE === 'undefined') return null;
-    var renderer;
-    try {
-      renderer = new THREE.WebGLRenderer({ canvas: $('#gl'), antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
-    } catch (e) { return null; }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-    renderer.setClearColor(0x000000, 1);
-    renderer.autoClear = false;
-
-    var scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x232a4a, 28, 100);
-    var camera = new THREE.PerspectiveCamera(48, 1, 0.1, 260);
-
-    var rt = renderer.capabilities.isWebGL2 ? new THREE.WebGLMultisampleRenderTarget(2, 2) : new THREE.WebGLRenderTarget(2, 2);
-    rt.texture.minFilter = THREE.LinearFilter;
-    rt.texture.magFilter = THREE.LinearFilter;
-    var quadScene = new THREE.Scene();
-    var quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
-    var quadMat = new THREE.MeshBasicMaterial({ map: rt.texture, transparent: true, opacity: 1, depthTest: false, depthWrite: false });
-    quadScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), quadMat));
-
-    function C(h) { return new THREE.Color(h); }
-    var T = {
-      night: { top: C(0x04060d), fog: C(0x232a4a), hemiS: C(0x8ea2ff), hemiG: C(0x20222c), sunC: C(0xa9bfff), ground: C(0x1b1f28), sky: C(0x151a26), orb: C(0xdfe8ff), fogF: 100, hemiI: 0.75, amb: 0.5, sunI: 0.8, city: 1, stars: 1, clouds: 0, lamp: 1, grid: 0.28 },
-      day: { top: C(0x2f7fd6), fog: C(0xbfdcf2), hemiS: C(0xffffff), hemiG: C(0x8d8574), sunC: C(0xfff0cc), ground: C(0x8e8a7f), sky: C(0x7f8fa6), orb: C(0xfff2c0), fogF: 110, hemiI: 1, amb: 0.55, sunI: 1.6, city: 0.03, stars: 0, clouds: 1, lamp: 0, grid: 0.14 }
-    };
-    var cur = {};
-    var start = T[state.theme] || T.night;
-    for (var tk in start) { cur[tk] = start[tk].isColor ? start[tk].clone() : start[tk]; }
-
-    var hemi = new THREE.HemisphereLight(0x8ea2ff, 0x20222c, 0.75); scene.add(hemi);
-    var amb = new THREE.AmbientLight(0x404858, 0.5); scene.add(amb);
-    var sun = new THREE.DirectionalLight(0xa9bfff, 0.8); sun.position.set(10, 16, 8); scene.add(sun);
-    var beaconLight = new THREE.PointLight(0xff7a00, 1.4, 14);
-    scene.add(beaconLight);
-
-    var skyGroup = new THREE.Group(); scene.add(skyGroup);
-    var domeMat = new THREE.ShaderMaterial({
-      uniforms: { uTop: { value: cur.top }, uBot: { value: cur.fog } },
-      vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform vec3 uTop; uniform vec3 uBot; varying vec3 vP; void main(){ float t = smoothstep(-0.02, 0.6, normalize(vP).y); gl_FragColor = vec4(mix(uBot, uTop, t), 1.0); }',
-      side: THREE.BackSide, depthWrite: false
-    });
-    var dome = new THREE.Mesh(new THREE.SphereGeometry(200, 24, 14), domeMat);
-    dome.renderOrder = -10; skyGroup.add(dome);
-
-    var STARS = 260, sp = new Float32Array(STARS * 3);
-    for (var si = 0; si < STARS; si++) {
-      var sa = Math.random() * Math.PI * 2, sy = 0.05 + Math.random() * 0.95, sr = Math.sqrt(1 - sy * sy);
-      sp[si * 3] = Math.cos(sa) * sr * 180; sp[si * 3 + 1] = sy * 180; sp[si * 3 + 2] = Math.sin(sa) * sr * 180;
-    }
-    var starGeo = new THREE.BufferGeometry(); starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
-    var starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, transparent: true, opacity: 1, fog: false, depthWrite: false });
-    skyGroup.add(new THREE.Points(starGeo, starMat));
-
-    var orbMat = new THREE.MeshBasicMaterial({ color: 0xdfe8ff, fog: false });
-    var orb = new THREE.Mesh(new THREE.CircleGeometry(9, 28), orbMat);
-    orb.position.set(-0.62, 0.22, -0.75).multiplyScalar(150); orb.lookAt(0, 0, 0); skyGroup.add(orb);
-    var haloMat = new THREE.MeshBasicMaterial({ color: 0xdfe8ff, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, fog: false, depthWrite: false });
-    var halo = new THREE.Mesh(new THREE.CircleGeometry(28, 28), haloMat);
-    halo.position.copy(orb.position).multiplyScalar(0.99); halo.lookAt(0, 0, 0); skyGroup.add(halo);
-
-    var cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0, fog: false });
-    var clouds = new THREE.Group(); scene.add(clouds);
-    for (var cldI = 0; cldI < 9; cldI++) {
-      var cldG = new THREE.Group();
-      for (var cldB = 0; cldB < 4; cldB++) {
-        var cldM = new THREE.Mesh(new THREE.BoxGeometry(5 + Math.random() * 5, 1.6 + Math.random(), 3 + Math.random() * 3), cloudMat);
-        cldM.position.set(cldB * 3.6 - 5, Math.random() * 1.2, Math.random() * 2 - 1); cldG.add(cldM);
-      }
-      var cldA = (cldI / 9) * Math.PI * 2, cldR = 40 + Math.random() * 25, cldY = 20 + Math.random() * 10;
-      cldG.position.set(Math.cos(cldA) * cldR, cldY, Math.sin(cldA) * cldR);
-      cldG.userData = { a: cldA, r: cldR, y: cldY, s: 0.01 + Math.random() * 0.015 };
-      clouds.add(cldG);
-    }
-
-    var mConcrete = new THREE.MeshStandardMaterial({ color: 0x8c9099, roughness: 0.9, metalness: 0.05 });
-    var mSlab = new THREE.MeshStandardMaterial({ color: 0x585d68, roughness: 0.85 });
-    var mSteel = new THREE.MeshStandardMaterial({ color: 0xffc400, roughness: 0.45, metalness: 0.35 });
-    var mDark = new THREE.MeshStandardMaterial({ color: 0x1a1c22, roughness: 0.9 });
-    var mOrange = new THREE.MeshStandardMaterial({ color: 0xff7a00, roughness: 0.6 });
-    var lineMat = new THREE.LineBasicMaterial({ color: 0xffc400, transparent: true, opacity: 0.85 });
-
-    var groundMat = new THREE.MeshStandardMaterial({ color: 0x1b1f28, roughness: 1 });
-    var ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    scene.add(ground);
-    var grid = new THREE.GridHelper(160, 80, 0xffc400, 0x2a2d34);
-    grid.position.y = 0.01;
-    grid.material.transparent = true;
-    grid.material.opacity = 0.22;
-    scene.add(grid);
-
-    var foundation = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.4, 6.2), mSlab);
-    foundation.position.y = -0.2;
-    scene.add(foundation);
-
-    var H = 1.1;
-    var building = new THREE.Group();
-    scene.add(building);
-    var colGeo = new THREE.BoxGeometry(0.42, H, 0.42); colGeo.translate(0, H / 2, 0);
-    var slabGeo = new THREE.BoxGeometry(7.2, 0.22, 5.2); slabGeo.translate(0, H - 0.11, 0);
-    var slabEdges = new THREE.EdgesGeometry(slabGeo);
-    var braceLen = Math.sqrt(9 + H * H), braceAng = Math.atan2(3, H);
-    var braceGeo = new THREE.BoxGeometry(0.07, braceLen, 0.07);
-    var xs = [-3, 0, 3], zs = [-2, 2], floors = [];
-    for (var i = 0; i < N; i++) {
-      var g = new THREE.Group();
-      g.position.y = i * H;
-      xs.forEach(function (x) { zs.forEach(function (z) {
-        var c = new THREE.Mesh(colGeo, mConcrete); c.position.set(x, 0, z); g.add(c);
-      }); });
-      g.add(new THREE.Mesh(slabGeo, mSlab));
-      g.add(new THREE.LineSegments(slabEdges, lineMat));
-      zs.forEach(function (z) { [-1.5, 1.5].forEach(function (cx) { [-1, 1].forEach(function (s) {
-        var b = new THREE.Mesh(braceGeo, mSteel);
-        b.position.set(cx, H / 2, z);
-        b.rotation.z = s * braceAng;
-        g.add(b);
-      }); }); });
-      building.add(g);
-      floors.push(g);
-    }
-
-    var beacon = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), new THREE.MeshBasicMaterial({ color: 0xff7a00 }));
-    scene.add(beacon);
-
-    var crane = new THREE.Group();
-    crane.position.set(7.5, 0, -1.5);
-    scene.add(crane);
-    var cbase = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.8, 2.2), mDark);
-    cbase.position.y = 0.4; crane.add(cbase);
-    var mastH = 15, mw = 0.9, seg = 1;
-    var mast = new THREE.Group();
-    mast.position.y = 0.8;
-    crane.add(mast);
-    var postGeo = new THREE.BoxGeometry(0.12, mastH, 0.12);
-    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (c) {
-      var m = new THREE.Mesh(postGeo, mSteel);
-      m.position.set(c[0] * mw / 2, mastH / 2, c[1] * mw / 2);
-      mast.add(m);
-    });
-    var dLen = Math.sqrt(mw * mw + seg * seg), dAng = Math.atan2(mw, seg);
-    var dGeo = new THREE.BoxGeometry(0.05, dLen, 0.05);
-    var hGeoX = new THREE.BoxGeometry(mw, 0.05, 0.05);
-    var hGeoZ = new THREE.BoxGeometry(0.05, 0.05, mw);
-    for (var k = 0; k < mastH; k++) {
-      var y = k * seg + seg / 2, fl = (k % 2 ? 1 : -1);
-      var a = new THREE.Mesh(dGeo, mSteel); a.position.set(0, y, mw / 2); a.rotation.z = dAng * fl; mast.add(a);
-      var b2 = new THREE.Mesh(dGeo, mSteel); b2.position.set(0, y, -mw / 2); b2.rotation.z = -dAng * fl; mast.add(b2);
-      var c2 = new THREE.Mesh(dGeo, mSteel); c2.position.set(mw / 2, y, 0); c2.rotation.x = dAng * fl; mast.add(c2);
-      var d2 = new THREE.Mesh(dGeo, mSteel); d2.position.set(-mw / 2, y, 0); d2.rotation.x = -dAng * fl; mast.add(d2);
-      [mw / 2, -mw / 2].forEach(function (o) {
-        var h1 = new THREE.Mesh(hGeoX, mSteel); h1.position.set(0, k * seg, o); mast.add(h1);
-        var h2 = new THREE.Mesh(hGeoZ, mSteel); h2.position.set(o, k * seg, 0); mast.add(h2);
-      });
-    }
-
-    var jib = new THREE.Group();
-    jib.position.y = 0.8 + mastH + 0.3;
-    crane.add(jib);
-    var main = new THREE.Mesh(new THREE.BoxGeometry(14, 0.5, 0.55), mSteel); main.position.x = 6.5; jib.add(main);
-    var topChord = new THREE.Mesh(new THREE.BoxGeometry(14, 0.12, 0.12), mSteel); topChord.position.set(6.5, 0.9, 0); jib.add(topChord);
-    var counter = new THREE.Mesh(new THREE.BoxGeometry(5, 0.5, 0.55), mSteel); counter.position.x = -3; jib.add(counter);
-    var cab = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1, 1), mDark); cab.position.set(-0.2, -0.9, 0.9); jib.add(cab);
-    for (var cw = 0; cw < 3; cw++) {
-      var wgt = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.4), mConcrete);
-      wgt.position.set(-4.2 + cw * 1.25, -0.2, 0); jib.add(wgt);
-    }
-    var peak = new THREE.Mesh(new THREE.ConeGeometry(0.55, 2.6, 4), mSteel); peak.position.y = 1.9; peak.rotation.y = Math.PI / 4; jib.add(peak);
-    function cable(x1, y1, x2, y2) {
-      var geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x1, y1, 0), new THREE.Vector3(x2, y2, 0)]);
-      jib.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xcccccc })));
-    }
-    cable(0, 3.2, 12.5, 0.3);
-    cable(0, 3.2, -5.2, 0.3);
-
-    var trolley = new THREE.Group();
-    jib.add(trolley);
-    var tbody = new THREE.Mesh(new THREE.BoxGeometry(1, 0.35, 0.9), mDark); tbody.position.y = -0.4; trolley.add(tbody);
-    var rope = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1, 0.05), new THREE.MeshBasicMaterial({ color: 0xdddddd }));
-    trolley.add(rope);
-    var hook = new THREE.Group();
-    trolley.add(hook);
-    var hookBlock = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.5), mSteel); hook.add(hookBlock);
-    var load = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.3, 1.3), mConcrete); load.position.y = -1.1; hook.add(load);
-
-    function props() {
-      var tex = (function () {
-        var c = document.createElement('canvas'); c.width = 128; c.height = 32;
-        var x = c.getContext('2d');
-        x.fillStyle = '#ffc400'; x.fillRect(0, 0, 128, 32);
-        x.fillStyle = '#111';
-        for (var s = -32; s < 160; s += 32) { x.beginPath(); x.moveTo(s, 32); x.lineTo(s + 16, 32); x.lineTo(s + 32, 0); x.lineTo(s + 16, 0); x.closePath(); x.fill(); }
-        var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 1); return t;
-      })();
-      var mHaz = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 });
-      [[-4.5, 6.8, 0], [0, 7.2, 0.1], [4.6, 6.8, -0.12]].forEach(function (p) {
-        var bar = new THREE.Mesh(new THREE.BoxGeometry(3, 0.6, 0.12), mHaz);
-        bar.position.set(p[0], 0.7, p[1]); bar.rotation.y = p[2]; scene.add(bar);
-      });
-      var barrelGeo = new THREE.CylinderGeometry(0.45, 0.45, 1.1, 14);
-      [[-6.5, 5], [-5.6, 5.6], [-6.2, 6.3]].forEach(function (p) {
-        var bl = new THREE.Mesh(barrelGeo, mOrange); bl.position.set(p[0], 0.55, p[1]); scene.add(bl);
-      });
-      var coneGeo = new THREE.ConeGeometry(0.4, 1, 12);
-      [[5, 5.5], [6.2, 5.2], [7.4, 4.9], [-8, 3.5]].forEach(function (p) {
-        var cn = new THREE.Mesh(coneGeo, mOrange); cn.position.set(p[0], 0.5, p[1]); scene.add(cn);
-        var cb = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 0.8), mDark); cb.position.set(p[0], 0.04, p[1]); scene.add(cb);
-      });
-      for (var s = 0; s < 3; s++) {
-        var blk = new THREE.Mesh(new THREE.BoxGeometry(1, 0.5, 2), mConcrete);
-        blk.position.set(-7.5, 0.25 + s * 0.5, -3 + (s === 2 ? 0.3 : 0)); scene.add(blk);
-      }
-      for (var q = 0; q < 5; q++) {
-        var beam = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 5), mSteel);
-        beam.position.set(-7.5 + (q % 3) * 0.26, 0.12 + Math.floor(q / 3) * 0.24, -7.5); scene.add(beam);
-      }
-      var cont = new THREE.Mesh(new THREE.BoxGeometry(5.2, 2.3, 2.2), new THREE.MeshStandardMaterial({ color: 0xc2491d, roughness: 0.7 }));
-      cont.position.set(-11, 1.15, -6); cont.rotation.y = 0.45; scene.add(cont);
-      var cont2 = new THREE.Mesh(new THREE.BoxGeometry(5.2, 2.3, 2.2), new THREE.MeshStandardMaterial({ color: 0x2f5d8a, roughness: 0.7 }));
-      cont2.position.set(-11.4, 3.45, -6.2); cont2.rotation.y = 0.5; scene.add(cont2);
-    }
-    props();
-
-    var road = new THREE.Mesh(new THREE.PlaneGeometry(100, 7), new THREE.MeshStandardMaterial({ color: 0x2a2d35, roughness: 1 }));
-    road.rotation.x = -Math.PI / 2; road.position.set(0, 0.02, -16); scene.add(road);
-    var dashGeo = new THREE.PlaneGeometry(2, 0.22), dashMat = new THREE.MeshBasicMaterial({ color: 0xffc400 });
-    for (var rd = -12; rd < 12; rd++) {
-      var dash = new THREE.Mesh(dashGeo, dashMat);
-      dash.rotation.x = -Math.PI / 2; dash.position.set(rd * 4, 0.03, -16); scene.add(dash);
-    }
-
-    var lampGeo = new THREE.BoxGeometry(0.16, 7, 0.16); lampGeo.translate(0, 3.5, 0);
-    var beamGeo = new THREE.CylinderGeometry(0.15, 2.6, 6.4, 18, 1, true); beamGeo.translate(0, -3.2, 0);
-    var headMat = new THREE.MeshBasicMaterial({ color: 0xfff0b0, fog: false });
-    var beamMat = new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-    var lampLights = [];
-    [[-8, 7], [9, 7], [-9, -8], [10.5, -8.5]].forEach(function (p, i) {
-      var pole = new THREE.Mesh(lampGeo, mDark); pole.position.set(p[0], 0, p[1]); scene.add(pole);
-      var head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.5), headMat); head.position.set(p[0], 7.1, p[1]); scene.add(head);
-      var beam = new THREE.Mesh(beamGeo, beamMat); beam.position.set(p[0], 7, p[1]); scene.add(beam);
-      if (i < 2) { var pl = new THREE.PointLight(0xffe7a0, 0, 18); pl.position.set(p[0], 6.5, p[1]); scene.add(pl); lampLights.push(pl); }
-    });
-
-    var winTex = (function () {
-      var c = document.createElement('canvas'); c.width = 64; c.height = 64;
-      var x = c.getContext('2d');
-      x.fillStyle = '#000'; x.fillRect(0, 0, 64, 64);
-      for (var r = 0; r < 4; r++) for (var q = 0; q < 4; q++) {
-        if (Math.random() < 0.55) { x.fillStyle = Math.random() < 0.8 ? '#ffd27a' : '#bfe3ff'; x.fillRect(q * 16 + 3, r * 16 + 4, 10, 8); }
-      }
-      var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
-    })();
-    var cityMat = new THREE.MeshStandardMaterial({ color: 0x151a26, roughness: 1, emissive: 0xffffff, emissiveMap: winTex, emissiveIntensity: 1 });
-    for (var sk = 0; sk < 46; sk++) {
-      var ang = (sk / 46) * Math.PI * 2 + Math.random() * 0.1, rad = 52 + Math.random() * 18;
-      var hh = 8 + Math.random() * 34, ww = 4 + Math.random() * 6;
-      var bg = new THREE.BoxGeometry(ww, hh, ww), uv = bg.attributes.uv;
-      for (var u = 0; u < uv.count; u++) uv.setXY(u, uv.getX(u) * ww / 5, uv.getY(u) * hh / 6);
-      var bld = new THREE.Mesh(bg, cityMat);
-      bld.position.set(Math.cos(ang) * rad, hh / 2, Math.sin(ang) * rad);
-      scene.add(bld);
-    }
-
-    var cubes = [];
-    var cubeGeo = new THREE.BoxGeometry(0.55, 0.55, 0.55), cubeEdge = new THREE.EdgesGeometry(cubeGeo);
-    for (var f = 0; f < 9; f++) {
-      var cg = new THREE.Group();
-      cg.add(new THREE.Mesh(cubeGeo, mSteel));
-      cg.add(new THREE.LineSegments(cubeEdge, new THREE.LineBasicMaterial({ color: 0x000000 })));
-      var fa = Math.random() * Math.PI * 2, fr = 9 + Math.random() * 7;
-      cg.userData = { a: fa, r: fr, y: 3 + Math.random() * 11, s: 0.15 + Math.random() * 0.25, p: Math.random() * 6 };
-      scene.add(cg); cubes.push(cg);
-    }
-
-    var DUST = 320, dustPos = new Float32Array(DUST * 3);
-    for (var d = 0; d < DUST; d++) { dustPos[d * 3] = (Math.random() - 0.5) * 50; dustPos[d * 3 + 1] = Math.random() * 22; dustPos[d * 3 + 2] = (Math.random() - 0.5) * 50; }
-    var dustGeo = new THREE.BufferGeometry(); dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
-    var dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0xffc400, size: 0.1, transparent: true, opacity: 0.7, depthWrite: false }));
-    scene.add(dust);
-
-    var camPos = new THREE.Vector3(24, 10, 28), camLook = new THREE.Vector3(1.5, 5, 0);
-    var desired = new THREE.Vector3(), lookT = new THREE.Vector3(), prev = camPos.clone();
-    var motion = 0, time = 0;
-
+    var cv = $('#gl'), g = cv.getContext('2d', { alpha: false });
+    if (!g) return null;
+    var W = 1, H = 1, F = 800;
     function resize() {
-      var w = window.innerWidth, h = window.innerHeight;
-      renderer.setSize(w, h, false);
-      rt.setSize(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
-      camera.aspect = w / h;
-      camera.fov = w < h ? 62 : 48;
-      camera.updateProjectionMatrix();
+      var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      W = window.innerWidth; H = window.innerHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      F = Math.min(H, W * 1.25) * 1.1;
     }
     resize();
     window.addEventListener('resize', resize);
 
+    var PAL = {
+      night: { top: [4, 7, 18], bot: [24, 34, 72], gr: [8, 11, 22], city1: [12, 17, 36], city2: [18, 26, 54], line: [255, 196, 0], crane: [255, 150, 40], grid: [110, 140, 255], sun: [223, 232, 255], star: 1 },
+      day: { top: [26, 80, 156], bot: [150, 196, 238], gr: [30, 60, 104], city1: [104, 152, 208], city2: [66, 116, 182], line: [240, 247, 255], crane: [255, 205, 50], grid: [190, 220, 255], sun: [255, 244, 200], star: 0 }
+    };
+    var cur = JSON.parse(JSON.stringify(PAL[state.theme] || PAL.night));
+    function mixTo(t, k) {
+      for (var key in t) {
+        var v = t[key], c = cur[key];
+        if (typeof v === 'number') cur[key] += (v - c) * k;
+        else for (var i = 0; i < 3; i++) c[i] += (v[i] - c[i]) * k;
+      }
+    }
+    function rgb(c, a) { return 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + a + ')'; }
+    function rnd(seed) { var s = seed; return function () { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; }
+
+    var layers = [0, 1].map(function (L) {
+      var r = rnd(97 + L * 31), arr = [], n = 30;
+      for (var i = 0; i < n; i++) arr.push({ x: (i + r() * 0.6) / n, w: 34 + r() * 40, h: (L ? 60 : 40) + r() * (L ? 140 : 110), ox: Math.floor(r() * 24), oy: Math.floor(r() * 30) });
+      return arr;
+    });
+    var winPat = (function () {
+      var c = document.createElement('canvas'); c.width = 24; c.height = 30;
+      var x = c.getContext('2d'), r = rnd(5);
+      for (var row = 0; row < 5; row++) for (var col = 0; col < 4; col++) {
+        if (r() < 0.45) { x.fillStyle = r() < 0.85 ? '#ffd27a' : '#bfe3ff'; x.fillRect(col * 6 + 1, row * 6 + 1, 3, 4); }
+      }
+      return g.createPattern(c, 'repeat');
+    })();
+    var stars = [], dust = [], cubes = [];
+    (function () {
+      var r = rnd(11), i;
+      for (i = 0; i < 90; i++) stars.push([r(), r(), r() * 6.28, 0.5 + r()]);
+      for (i = 0; i < 90; i++) dust.push([(r() - 0.5) * 44, r() * 20, (r() - 0.5) * 44, 0.2 + r() * 0.4]);
+      for (i = 0; i < 6; i++) cubes.push({ a: r() * 6.28, r: 11 + r() * 6, y: 4 + r() * 10, s: 0.12 + r() * 0.2, p: r() * 6 });
+    })();
+
+    var CAMS = {
+      hub: { yaw: 0.75, pitch: 0.22, dist: 34, t: [1, 5.5, 0], ox: 0.2 },
+      skills: { yaw: -0.6, pitch: 0.12, dist: 30, t: [0, 5, 0], ox: -0.2 },
+      research: { yaw: 0.1, pitch: 0.75, dist: 38, t: [0, 3, 0], ox: 0.2 },
+      opensource: { yaw: 1.5, pitch: 0.3, dist: 30, t: [4, 8, 0], ox: -0.2 },
+      projects: { yaw: 2.7, pitch: 0.2, dist: 36, t: [0, 6, 0], ox: 0.2 },
+      contact: { yaw: 3.8, pitch: 0.03, dist: 26, t: [2, 8, 0], ox: -0.2 }
+    };
+    var cam = { yaw: 0.75, pitch: 0.22, dist: 34, tx: 1, ty: 5.5, tz: 0, ox: 0 };
+
+    var cx = 0, cy = 0, cz = 0, rx = 1, rz = 0, ux = 0, uy = 1, uz = 0, fx = 0, fy = 0, fz = -1, OX = 0;
+    var paths = null, quadPath = null, pr = [0, 0, 0];
+    var time = 0, acc = 0, motion = 0, pYaw = cam.yaw, pDist = cam.dist;
+    var ALPHA = [1, 0.78, 0.52, 0.28];
+
+    function newPaths() {
+      var o = {};
+      ['line', 'crane', 'grid'].forEach(function (k) { o[k] = [new Path2D(), new Path2D(), new Path2D(), new Path2D()]; });
+      return o;
+    }
+    function proj(x, y, z) {
+      var ax = x - cx, ay = y - cy, az = z - cz, c = ax * fx + ay * fy + az * fz;
+      if (c < 0.3) return false;
+      pr[0] = OX + F * (ax * rx + az * rz) / c;
+      pr[1] = H / 2 - F * (ax * ux + ay * uy + az * uz) / c;
+      pr[2] = c;
+      return true;
+    }
+    function seg(grp, x1, y1, z1, x2, y2, z2) {
+      var ax = x1 - cx, ay = y1 - cy, az = z1 - cz, bx = x2 - cx, by = y2 - cy, bz = z2 - cz;
+      var a1 = ax * rx + az * rz, b1 = ax * ux + ay * uy + az * uz, c1 = ax * fx + ay * fy + az * fz;
+      var a2 = bx * rx + bz * rz, b2 = bx * ux + by * uy + bz * uz, c2 = bx * fx + by * fy + bz * fz;
+      if (c1 < 0.3 && c2 < 0.3) return;
+      var t;
+      if (c1 < 0.3) { t = (0.3 - c1) / (c2 - c1); a1 += (a2 - a1) * t; b1 += (b2 - b1) * t; c1 = 0.3; }
+      else if (c2 < 0.3) { t = (0.3 - c2) / (c1 - c2); a2 += (a1 - a2) * t; b2 += (b1 - b2) * t; c2 = 0.3; }
+      var d = (c1 + c2) * 0.5, p = paths[grp][d < 22 ? 0 : d < 36 ? 1 : d < 54 ? 2 : 3];
+      p.moveTo(OX + F * a1 / c1, H / 2 - F * b1 / c1);
+      p.lineTo(OX + F * a2 / c2, H / 2 - F * b2 / c2);
+    }
+    function boxS(S, x0, y0, z0, x1, y1, z1) {
+      S(x0, y0, z0, x1, y0, z0); S(x1, y0, z0, x1, y0, z1); S(x1, y0, z1, x0, y0, z1); S(x0, y0, z1, x0, y0, z0);
+      S(x0, y1, z0, x1, y1, z0); S(x1, y1, z0, x1, y1, z1); S(x1, y1, z1, x0, y1, z1); S(x0, y1, z1, x0, y1, z0);
+      S(x0, y0, z0, x0, y1, z0); S(x1, y0, z0, x1, y1, z0); S(x1, y0, z1, x1, y1, z1); S(x0, y0, z1, x0, y1, z1);
+    }
+    function dashed(x1, z1, x2, z2) {
+      var n = Math.round(Math.hypot(x2 - x1, z2 - z1));
+      for (var i = 0; i < n; i += 2) seg('crane', x1 + (x2 - x1) * i / n, 0, z1 + (z2 - z1) * i / n, x1 + (x2 - x1) * (i + 1) / n, 0, z1 + (z2 - z1) * (i + 1) / n);
+    }
+    function cube(x0, y0, z0, s, ry, rxa) {
+      var v = [], i, j, k;
+      var c1 = Math.cos(ry), s1 = Math.sin(ry), c2 = Math.cos(rxa), s2 = Math.sin(rxa);
+      for (i = -1; i <= 1; i += 2) for (j = -1; j <= 1; j += 2) for (k = -1; k <= 1; k += 2) {
+        var x = i * s, y = j * s, z = k * s, xr = x * c1 + z * s1, zr = -x * s1 + z * c1;
+        v.push([x0 + xr, y0 + y * c2 - zr * s2, z0 + y * s2 + zr * c2]);
+      }
+      [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]].forEach(function (e) {
+        seg('line', v[e[0]][0], v[e[0]][1], v[e[0]][2], v[e[1]][0], v[e[1]][1], v[e[1]][2]);
+      });
+    }
+
+    var XS = [-3, 0, 3], BX = 3.6, BZ = 2.6, FH = 1.1;
+    function rect(y) {
+      seg('line', -BX, y, -BZ, BX, y, -BZ); seg('line', BX, y, -BZ, BX, y, BZ);
+      seg('line', BX, y, BZ, -BX, y, BZ); seg('line', -BX, y, BZ, -BX, y, -BZ);
+    }
+    function quad(y) {
+      var pts = [[-BX, -BZ], [BX, -BZ], [BX, BZ], [-BX, BZ]];
+      for (var i = 0; i < 4; i++) {
+        if (!proj(pts[i][0], y, pts[i][1])) return;
+        if (i) quadPath.lineTo(pr[0], pr[1]); else quadPath.moveTo(pr[0], pr[1]);
+      }
+      quadPath.closePath();
+    }
+    function drawBuilding() {
+      var topY = 0;
+      for (var i = 0; i < N; i++) {
+        var s = clamp(state.built - i, 0, 1);
+        if (s < 0.01) break;
+        var y0 = i * FH, y1 = y0 + s * FH;
+        topY = y1;
+        XS.forEach(function (x) { seg('line', x, y0, -2, x, y1, -2); seg('line', x, y0, 2, x, y1, 2); });
+        rect(y1);
+        if (i === 0) rect(0);
+        for (var b = 0; b < 2; b++) {
+          [-2, 2].forEach(function (z) { seg('line', XS[b], y0, z, XS[b + 1], y1, z); seg('line', XS[b + 1], y0, z, XS[b], y1, z); });
+        }
+        quad(y1);
+      }
+      return topY;
+    }
+    var CX = 8.5, CZ = -2, MH = 15;
+    function drawCrane() {
+      var h = 0.45, k, s;
+      [[-h, -h], [h, -h], [h, h], [-h, h]].forEach(function (c) { seg('crane', CX + c[0], 0, CZ + c[1], CX + c[0], MH, CZ + c[1]); });
+      for (k = 0; k < MH; k++) {
+        s = k % 2 ? 1 : -1;
+        seg('crane', CX - h, k, CZ - h, CX + h, k, CZ - h); seg('crane', CX + h, k, CZ - h, CX + h, k, CZ + h);
+        seg('crane', CX + h, k, CZ + h, CX - h, k, CZ + h); seg('crane', CX - h, k, CZ + h, CX - h, k, CZ - h);
+        seg('crane', CX - s * h, k, CZ - h, CX + s * h, k + 1, CZ - h);
+        seg('crane', CX + s * h, k, CZ + h, CX - s * h, k + 1, CZ + h);
+        seg('crane', CX + h, k, CZ - s * h, CX + h, k + 1, CZ + s * h);
+        seg('crane', CX - h, k, CZ + s * h, CX - h, k + 1, CZ - s * h);
+      }
+      var ja = Math.sin(time * 0.15) * 1.2 - 0.4, ca = Math.cos(ja), sa = Math.sin(ja), JY = MH + 0.4;
+      function J(x1, y1, z1, x2, y2, z2) {
+        seg('crane', CX + x1 * ca + z1 * sa, JY + y1, CZ - x1 * sa + z1 * ca, CX + x2 * ca + z2 * sa, JY + y2, CZ - x2 * sa + z2 * ca);
+      }
+      J(-5.5, 0.9, 0, 14, 0.9, 0); J(-5.5, 0, -0.3, 14, 0, -0.3); J(-5.5, 0, 0.3, 14, 0, 0.3);
+      for (var x = -5; x < 14; x++) {
+        var q = x % 2 ? 1 : -1;
+        J(x, 0.9, 0, x + 1, 0, 0.3 * q); J(x, 0, -0.3 * q, x + 1, 0.9, 0);
+      }
+      J(0, 0, 0, 0, 2.6, 0); J(0, 2.6, 0, 12.5, 0.9, 0); J(0, 2.6, 0, -5, 0.9, 0);
+      boxS(J, -5.4, -1.1, -0.6, -3.6, 0, 0.6);
+      var tx = 7 + Math.sin(time * 0.4) * 3, L = 6 + (Math.sin(time * 0.5) * 0.5 + 0.5) * 5;
+      J(tx, 0, 0, tx, -L, 0);
+      boxS(J, tx - 0.65, -L - 1.3, -0.65, tx + 0.65, -L, 0.65);
+    }
+
     function render(dt) {
-      time += dt;
+      acc += dt;
+      if (reduce ? acc < 0.2 : (motion < 0.03 && Math.abs(state.vel) < 1.5 && acc < 0.033)) return;
+      dt = acc; acc = 0;
+      if (!reduce) time += dt;
+
+      var C = CAMS[state.key] || CAMS.hub, k = 1 - Math.pow(0.03, dt);
+      cam.yaw += (C.yaw + time * 0.05 + state.scrollProg + mouse.x * 0.1 - cam.yaw) * k;
+      cam.pitch += (C.pitch - mouse.y * 0.04 - cam.pitch) * k;
+      cam.dist += (C.dist - cam.dist) * k;
+      cam.tx += (C.t[0] - cam.tx) * k; cam.ty += (C.t[1] - cam.ty) * k; cam.tz += (C.t[2] - cam.tz) * k;
+      cam.ox += (C.ox - cam.ox) * k;
+
       var base = 0.35 + 0.1 * (state.visitedCount || 0);
       var target = state.key === 'hub' ? N * base : N * (base + (1 - base) * state.scrollProg);
       state.built += (target - state.built) * (1 - Math.exp(-dt * 2.2));
-      for (var i = 0; i < N; i++) {
-        var s = clamp(state.built - i, 0, 1);
-        floors[i].visible = s > 0.002;
-        floors[i].scale.y = Math.max(s, 0.0001);
-      }
-      var topY = Math.min(state.built, N) * H;
-      var topped = state.built > N - 0.05;
-      beacon.position.set(0, topY + 0.55, 0);
-      beaconLight.position.set(0, topY + 1.2, 0);
-      var blink = (Math.sin(time * 5) > 0) ? 1 : 0.15;
-      beacon.material.color.setRGB(1 * blink, 0.48 * blink, 0);
-      beacon.scale.setScalar(topped ? 1.4 : 1);
-      beaconLight.intensity = 0.3 + blink * 1.4;
 
-      jib.rotation.y = Math.sin(time * 0.15) * 1.2 - 0.4;
-      var tx = 7 + Math.sin(time * 0.4) * 3;
-      trolley.position.x = tx;
-      var L = 6 + (Math.sin(time * 0.5) * 0.5 + 0.5) * 5;
-      rope.scale.y = L; rope.position.y = -0.55 - L / 2;
-      hook.position.y = -0.55 - L;
-      hook.rotation.z = Math.sin(time * 1.1) * 0.05;
-
-      cubes.forEach(function (c) {
-        var u = c.userData;
-        var a = u.a + time * u.s * (reduce ? 0 : 0.35);
-        c.position.set(Math.cos(a) * u.r, u.y + Math.sin(time * 0.8 + u.p) * 0.6, Math.sin(a) * u.r);
-        c.rotation.x += dt * 0.6; c.rotation.y += dt * 0.8;
-      });
-      var arr = dustGeo.attributes.position.array;
-      for (var p = 0; p < DUST; p++) {
-        arr[p * 3 + 1] += dt * 0.25;
-        if (arr[p * 3 + 1] > 22) arr[p * 3 + 1] = 0;
-      }
-      dustGeo.attributes.position.needsUpdate = true;
-
-      var c = CAM[state.key] || CAM.hub;
-      var ang = reduce ? 0 : (time * 0.04 + state.scrollProg * 1.1);
-      var cs = Math.cos(ang), sn = Math.sin(ang);
-      desired.set(c.p[0] * cs + c.p[2] * sn + mouse.x * 1.2, c.p[1] + mouse.y * 0.8, -c.p[0] * sn + c.p[2] * cs);
-      var k = 1 - Math.pow(0.02, dt);
-      camPos.lerp(desired, k);
-      lookT.set(c.l[0], c.l[1], c.l[2]);
-      camLook.lerp(lookT, k);
-      camera.position.copy(camPos);
-      camera.lookAt(camLook);
-
-      var speed = prev.distanceTo(camera.position) / Math.max(dt, 0.001);
-      prev.copy(camera.position);
-      var m = clamp((speed - 1.6) / 9 + Math.abs(state.vel) * 0.012, 0, 1);
+      var sdt = Math.max(dt, 0.001);
+      var m = clamp(Math.abs(cam.yaw - pYaw) / sdt * 0.35 + Math.abs(cam.dist - pDist) / sdt * 0.02 + Math.abs(state.vel) * 0.012, 0, 1);
+      pYaw = cam.yaw; pDist = cam.dist;
       motion += (m - motion) * 0.25;
-      quadMat.opacity = reduce ? 1 : 1 - motion * 0.7;
+      var bgA = reduce ? 1 : 1 - motion * 0.55;
 
-      var tt = T[state.theme] || T.night, kk = 1 - Math.exp(-dt * 3);
-      for (var tk2 in tt) {
-        var tv = tt[tk2];
-        if (tv.isColor) cur[tk2].lerp(tv, kk); else cur[tk2] += (tv - cur[tk2]) * kk;
+      mixTo(PAL[state.theme] || PAL.night, 1 - Math.exp(-dt * 3));
+
+      var cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), cyw = Math.cos(cam.yaw), syw = Math.sin(cam.yaw);
+      cx = cam.tx + cam.dist * cp * syw; cy = cam.ty + cam.dist * sp; cz = cam.tz + cam.dist * cp * cyw;
+      fx = -cp * syw; fy = -sp; fz = -cp * cyw;
+      rx = cyw; rz = -syw;
+      ux = -syw * sp; uy = cp; uz = -sp * cyw;
+      OX = W / 2 + (W < 700 ? 0 : cam.ox * W);
+      var hy = clamp(H / 2 + F * fy / cp, -H, H * 2), i, st;
+
+      g.globalAlpha = bgA;
+      var sg = g.createLinearGradient(0, 0, 0, Math.max(hy, 1));
+      sg.addColorStop(0, rgb(cur.top, 1)); sg.addColorStop(1, rgb(cur.bot, 1));
+      g.fillStyle = sg; g.fillRect(0, 0, W, Math.max(hy, 0));
+
+      if (cur.star > 0.02 && hy > 0) {
+        g.fillStyle = '#fff';
+        for (i = 0; i < stars.length; i++) {
+          st = stars[i];
+          g.globalAlpha = bgA * cur.star * (0.4 + 0.6 * Math.abs(Math.sin(time * st[3] + st[2])));
+          g.fillRect((((st[0] - cam.yaw * 0.04) % 1) + 1) % 1 * W, st[1] * hy * 0.9, 1.6, 1.6);
+        }
+        g.globalAlpha = bgA;
       }
-      scene.fog.color.copy(cur.fog); scene.fog.far = cur.fogF;
-      hemi.color.copy(cur.hemiS); hemi.groundColor.copy(cur.hemiG); hemi.intensity = cur.hemiI;
-      amb.intensity = cur.amb;
-      sun.color.copy(cur.sunC); sun.intensity = cur.sunI;
-      groundMat.color.copy(cur.ground);
-      cityMat.color.copy(cur.sky); cityMat.emissiveIntensity = cur.city;
-      grid.material.opacity = cur.grid;
-      starMat.opacity = cur.stars;
-      orbMat.color.copy(cur.orb); haloMat.color.copy(cur.orb);
-      beamMat.opacity = cur.lamp * 0.13;
-      lampLights.forEach(function (l) { l.intensity = cur.lamp * 1.6; });
-      cloudMat.opacity = cur.clouds * 0.95;
-      clouds.visible = cur.clouds > 0.01;
-      clouds.children.forEach(function (cg2) {
-        var cu = cg2.userData;
-        cu.a += dt * cu.s;
-        cg2.position.set(Math.cos(cu.a) * cu.r, cu.y, Math.sin(cu.a) * cu.r);
-      });
-      skyGroup.position.copy(camera.position);
+      if (hy > 90) {
+        var ox2 = W * 0.76 + Math.sin(cam.yaw) * 30 + mouse.x * 10, oy2 = hy * 0.4, R = Math.min(W, H) * 0.045 + 14;
+        g.fillStyle = rgb(cur.sun, 0.07); g.beginPath(); g.arc(ox2, oy2, R * 3.2, 0, 6.283); g.fill();
+        g.fillStyle = rgb(cur.sun, 0.12); g.beginPath(); g.arc(ox2, oy2, R * 2, 0, 6.283); g.fill();
+        g.fillStyle = rgb(cur.sun, 1); g.beginPath(); g.arc(ox2, oy2, R, 0, 6.283); g.fill();
+      }
 
-      renderer.setRenderTarget(rt);
-      renderer.clear();
-      renderer.render(scene, camera);
-      renderer.setRenderTarget(null);
-      renderer.render(quadScene, quadCam);
+      function city(L, col, par, win) {
+        var arr = layers[L], P = Math.max(W * 1.7, 1500), off = -cam.yaw * par, sc = clamp(H / 800, 0.7, 1.3);
+        g.fillStyle = rgb(col, 1);
+        for (var n = 0; n < arr.length; n++) {
+          var b = arr[n], bw = b.w * sc, bh = b.h * sc, bx = ((b.x * P + off) % P + P) % P;
+          for (var rep = 0; rep < 2; rep++) {
+            var x = bx - rep * P;
+            if (x > W + 80 || x + bw < -80) continue;
+            g.fillRect(x, hy - bh, bw, bh + 2);
+            if (win && cur.star > 0.02) {
+              g.save(); g.globalAlpha = bgA * cur.star * 0.9; g.translate(b.ox, b.oy);
+              g.fillStyle = winPat; g.fillRect(x - b.ox, hy - bh - b.oy, bw, bh + 2);
+              g.restore();
+            }
+          }
+        }
+      }
+      city(0, cur.city1, 260, false);
+      var hz = g.createLinearGradient(0, hy - 140, 0, hy);
+      hz.addColorStop(0, rgb(cur.bot, 0)); hz.addColorStop(1, rgb(cur.bot, 0.6));
+      g.fillStyle = hz; g.fillRect(0, hy - 140, W, 142);
+      city(1, cur.city2, 420, true);
+
+      if (hy < H) {
+        var gy = Math.max(hy, 0), gg = g.createLinearGradient(0, gy, 0, H);
+        gg.addColorStop(0, rgb(cur.bot, 1)); gg.addColorStop(0.35, rgb(cur.gr, 1)); gg.addColorStop(1, rgb(cur.gr, 1));
+        g.fillStyle = gg; g.fillRect(0, gy, W, H - gy);
+      }
+      g.globalAlpha = 1;
+
+      paths = newPaths(); quadPath = new Path2D();
+      for (var gx = -32; gx <= 32; gx += 4) for (var gz = -32; gz < 32; gz += 4) {
+        seg('grid', gx, 0, gz, gx, 0, gz + 4); seg('grid', gz, 0, gx, gz + 4, 0, gx);
+      }
+      var topY = drawBuilding();
+      seg('line', 0, topY, 0, 0, topY + 0.6, 0);
+      drawCrane();
+      dashed(-9.5, -7.5, 9.5, -7.5); dashed(9.5, -7.5, 9.5, 7.5); dashed(9.5, 7.5, -9.5, 7.5); dashed(-9.5, 7.5, -9.5, -7.5);
+      var CS = function (a, b, c, d, e, h) { seg('crane', a, b, c, d, e, h); };
+      boxS(CS, -13.6, 0, -7, -8.4, 2.3, -4.8);
+      boxS(CS, -13.9, 2.3, -7.2, -8.7, 4.6, -5);
+      for (i = 0; i < cubes.length; i++) {
+        var cb = cubes[i], ca2 = cb.a + time * cb.s * 0.35;
+        cube(Math.cos(ca2) * cb.r, cb.y + Math.sin(time * 0.8 + cb.p) * 0.6, Math.sin(ca2) * cb.r, 0.35, time * 0.8 + cb.p, time * 0.6);
+      }
+
+      var glow = 0.04 + 0.12 * cur.star;
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      function flush(name, col, baseA, w, gl) {
+        for (var b = 0; b < 4; b++) {
+          var a = ALPHA[b] * baseA, p = paths[name][b];
+          if (gl) { g.lineWidth = w * 3.2; g.strokeStyle = rgb(col, a * gl); g.stroke(p); }
+          g.lineWidth = w; g.strokeStyle = rgb(col, a); g.stroke(p);
+        }
+      }
+      flush('grid', cur.grid, 0.35, 1, 0);
+      g.fillStyle = rgb(cur.line, 0.06); g.fill(quadPath);
+      flush('line', cur.line, 1, 1.3, glow);
+      flush('crane', cur.crane, 0.95, 1.2, glow);
+
+      g.fillStyle = rgb(cur.line, 0.5);
+      for (i = 0; i < dust.length; i++) {
+        var dp = dust[i];
+        if (proj(dp[0], (dp[1] + time * dp[3] * 1.2) % 20, dp[2])) g.fillRect(pr[0], pr[1], 1.8, 1.8);
+      }
+      if (proj(0, topY + 0.6, 0)) {
+        var bl = Math.sin(time * 5) > 0 ? 1 : 0.25;
+        g.fillStyle = 'rgba(255,122,0,' + (bl * 0.2) + ')'; g.beginPath(); g.arc(pr[0], pr[1], 11, 0, 6.283); g.fill();
+        g.fillStyle = 'rgba(255,122,0,' + bl + ')'; g.beginPath(); g.arc(pr[0], pr[1], 3.2, 0, 6.283); g.fill();
+      }
     }
     return { render: render };
   }
