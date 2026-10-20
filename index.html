@@ -932,7 +932,10 @@ body[data-theme="day"] .vignette{opacity:.45}
     renderer.autoClear = false;
 
     var scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x232a4a, 100, 1500);
+    // FIX 1: Push fog further away so it doesn't hide the city
+    scene.fog = new THREE.Fog(0x232a4a, 100, 1500); 
+    
+    // FIX 2: Increase camera 'far' plane to 2000 so we can see distant buildings
     var camera = new THREE.PerspectiveCamera(48, 1, 0.1, 2000);
 
     var rt = renderer.capabilities.isWebGL2 ? new THREE.WebGLMultisampleRenderTarget(2, 2) : new THREE.WebGLRenderTarget(2, 2);
@@ -985,8 +988,7 @@ body[data-theme="day"] .vignette{opacity:.45}
 
     var groundMat = new THREE.MeshStandardMaterial({ color: 0x1b1f28, roughness: 1 });
     var ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), groundMat);
-    ground.rotation.x = -Math.PI / 2; 
-    ground.position.y = -0.5;
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.5;
     scene.add(ground);
     
     var grid = new THREE.GridHelper(160, 80, 0xffc400, 0x2a2d34);
@@ -998,6 +1000,7 @@ body[data-theme="day"] .vignette{opacity:.45}
     // --- LOAD THE SKETCHFAB GLTF MODEL ---
     var cityModel = null;
     var loader = new THREE.GLTFLoader();
+    
     loader.load('./models/city.glb', function (gltf) {
         cityModel = gltf.scene;
         
@@ -1018,7 +1021,7 @@ body[data-theme="day"] .vignette{opacity:.45}
         // 4. Center the model and place it on the ground
         cityModel.position.x = -newCenter.x;
         cityModel.position.z = -newCenter.z;
-        cityModel.position.y = -newBox.min.y; // Sits exactly on Y=0
+        cityModel.position.y = -newBox.min.y; 
         
         // 5. Enable shadows
         cityModel.traverse(function (child) {
@@ -1034,11 +1037,7 @@ body[data-theme="day"] .vignette{opacity:.45}
     }, undefined, function (error) {
         console.error('An error happened loading the city model:', error);
     });
-        scene.add(cityModel);
-        console.log('Model added to scene');
-    }, undefined, function (error) {
-        console.error('An error happened loading the city model:', error);
-    });
+
     var camPos = new THREE.Vector3(24, 10, 28), camLook = new THREE.Vector3(1.5, 5, 0);
     var desired = new THREE.Vector3(), lookT = new THREE.Vector3(), prev = camPos.clone();
     var motion = 0, time = 0;
@@ -1057,8 +1056,6 @@ body[data-theme="day"] .vignette{opacity:.45}
     function render(dt) {
       time += dt;
       
-      // Procedural building animation removed; camera and lighting remain dynamic
-
       var c = CAM[state.key] || CAM.hub;
       var ang = reduce ? 0 : (time * 0.04 + state.scrollProg * 1.1);
       var cs = Math.cos(ang), sn = Math.sin(ang);
