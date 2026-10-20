@@ -932,8 +932,8 @@ body[data-theme="day"] .vignette{opacity:.45}
     renderer.autoClear = false;
 
     var scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x232a4a, 28, 100);
-    var camera = new THREE.PerspectiveCamera(48, 1, 0.1, 260);
+    scene.fog = new THREE.Fog(0x232a4a, 100, 1500);
+    var camera = new THREE.PerspectiveCamera(48, 1, 0.1, 2000);
 
     var rt = renderer.capabilities.isWebGL2 ? new THREE.WebGLMultisampleRenderTarget(2, 2) : new THREE.WebGLRenderTarget(2, 2);
     rt.texture.minFilter = THREE.LinearFilter;
@@ -1001,35 +1001,26 @@ body[data-theme="day"] .vignette{opacity:.45}
     loader.load('./models/city.glb', function (gltf) {
         cityModel = gltf.scene;
         
-        console.log('Model loaded successfully!');
-        console.log('Model children:', cityModel.children.length);
-        
-        // Calculate bounding box to understand the model's actual size
+        // 1. Calculate the bounding box of the entire model
         var box = new THREE.Box3().setFromObject(cityModel);
         var size = box.getSize(new THREE.Vector3());
-        var center = box.getCenter(new THREE.Vector3());
-        
-        console.log('Model size:', size);
-        console.log('Model center:', center);
-        
-        // Auto-scale the model to fit a reasonable size
         var maxDim = Math.max(size.x, size.y, size.z);
-        var targetSize = 50; // Target size in world units
+        
+        // 2. Scale the city down to fit in a 50-unit box
+        var targetSize = 50; 
         var scale = targetSize / maxDim;
-        
-        console.log('Auto-calculated scale:', scale);
-        
         cityModel.scale.set(scale, scale, scale);
         
-        // Recalculate after scaling
-        box = new THREE.Box3().setFromObject(cityModel);
-        center = box.getCenter(new THREE.Vector3());
+        // 3. Recalculate center after scaling
+        var newBox = new THREE.Box3().setFromObject(cityModel);
+        var newCenter = newBox.getCenter(new THREE.Vector3());
         
-        // Center the model at origin and place it on the ground
-        cityModel.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+        // 4. Center the model and place it on the ground
+        cityModel.position.x = -newCenter.x;
+        cityModel.position.z = -newCenter.z;
+        cityModel.position.y = -newBox.min.y; // Sits exactly on Y=0
         
-        console.log('Final position:', cityModel.position);
-        
+        // 5. Enable shadows
         cityModel.traverse(function (child) {
             if (child.isMesh) {
                 child.castShadow = true;
@@ -1037,6 +1028,12 @@ body[data-theme="day"] .vignette{opacity:.45}
             }
         });
         
+        scene.add(cityModel);
+        console.log("City loaded and scaled to fit.");
+        
+    }, undefined, function (error) {
+        console.error('An error happened loading the city model:', error);
+    });
         scene.add(cityModel);
         console.log('Model added to scene');
     }, undefined, function (error) {
